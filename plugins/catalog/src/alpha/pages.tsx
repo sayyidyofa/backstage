@@ -28,7 +28,10 @@ import {
   AsyncEntityProvider,
   entityRouteRef,
 } from '@backstage/plugin-catalog-react';
-import { EntityContentBlueprint } from '@backstage/plugin-catalog-react/alpha';
+import {
+  EntityContentBlueprint,
+  defaultEntityContentGroups,
+} from '@backstage/plugin-catalog-react/alpha';
 import { rootRouteRef } from '../routes';
 import { useEntityFromUrl } from '../components/CatalogEntityPage/useEntityFromUrl';
 import { buildFilterFn } from './filter/FilterWrapper';
@@ -62,41 +65,82 @@ export const catalogEntityPage = PageBlueprint.makeWithOverrides({
       EntityContentBlueprint.dataRefs.title,
       EntityContentBlueprint.dataRefs.filterFunction.optional(),
       EntityContentBlueprint.dataRefs.filterExpression.optional(),
+      EntityContentBlueprint.dataRefs.group.optional(),
     ]),
   },
-  factory(originalFactory, { inputs }) {
+  config: {
+    schema: {
+      groups: z =>
+        z.array(z.object({ id: z.string(), title: z.string() })).optional(),
+    },
+  },
+  factory(originalFactory, { config, inputs }) {
     return originalFactory({
       defaultPath: '/catalog/:namespace/:kind/:name',
       routeRef: convertLegacyRouteRef(entityRouteRef),
       loader: async () => {
         const { EntityLayout } = await import('../components/EntityLayout');
+
+        // Config groups can override default group titles
+        const groups: Record<string, string> = {
+          ...defaultEntityContentGroups,
+          ...config.groups?.reduce(
+            (rest, group) => ({ ...rest, [group.id]: group.title }),
+            {},
+          ),
+        };
+
+        const tabs = inputs.contents.reduce<
+          Record<string, Array<(typeof inputs.contents)[0]>>
+        >((rest, output) => {
+          const itemTitle = output.get(EntityContentBlueprint.dataRefs.title);
+          const groupId = output.get(EntityContentBlueprint.dataRefs.group);
+          const groupTitle = groupId ? groups[groupId] : undefined;
+          if (!groupTitle) {
+            return {
+              ...rest,
+              [itemTitle]: [output],
+            };
+          }
+          return {
+            ...rest,
+            [groupTitle]: [...(rest[groupTitle] ?? []), output],
+          };
+        }, {});
+
         const Component = () => {
           return (
             <AsyncEntityProvider {...useEntityFromUrl()}>
               <EntityLayout>
-                {inputs.contents.map(output => {
-                  return (
-                    <EntityLayout.Route
-                      key={output.get(coreExtensionData.routePath)}
-                      path={output.get(coreExtensionData.routePath)}
-                      title={output.get(EntityContentBlueprint.dataRefs.title)}
-                      if={buildFilterFn(
-                        output.get(
-                          EntityContentBlueprint.dataRefs.filterFunction,
-                        ),
-                        output.get(
-                          EntityContentBlueprint.dataRefs.filterExpression,
-                        ),
-                      )}
-                    >
-                      {output.get(coreExtensionData.reactElement)}
-                    </EntityLayout.Route>
-                  );
-                })}
+                {Object.entries(tabs).map(([group, items]) => (
+                  <EntityLayout.Group key={group} title={group}>
+                    {items.map(output => (
+                      <EntityLayout.Route
+                        key={output.get(coreExtensionData.routePath)}
+                        path={output.get(coreExtensionData.routePath)}
+                        group={group}
+                        title={output.get(
+                          EntityContentBlueprint.dataRefs.title,
+                        )}
+                        if={buildFilterFn(
+                          output.get(
+                            EntityContentBlueprint.dataRefs.filterFunction,
+                          ),
+                          output.get(
+                            EntityContentBlueprint.dataRefs.filterExpression,
+                          ),
+                        )}
+                      >
+                        {output.get(coreExtensionData.reactElement)}
+                      </EntityLayout.Route>
+                    ))}
+                  </EntityLayout.Group>
+                ))}
               </EntityLayout>
             </AsyncEntityProvider>
           );
         };
+
         return compatWrapper(<Component />);
       },
     });

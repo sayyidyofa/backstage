@@ -69,6 +69,7 @@
     "@types/react-sparklines": "^1.7.0",
     "ansi-regex": "^6.0.1",
     "classnames": "^2.2.6",
+    "clsx": "^2.1.1",
     "d3-selection": "^3.0.0",
     "d3-shape": "^3.0.0",
     "d3-zoom": "^3.0.0",

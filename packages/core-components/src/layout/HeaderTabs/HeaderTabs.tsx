@@ -15,9 +15,10 @@
  */
 import Box from '@material-ui/core/Box';
 import { makeStyles } from '@material-ui/core/styles';
-import TabUI, { TabProps } from '@material-ui/core/Tab';
+import { TabProps } from '@material-ui/core/Tab';
 import Tabs from '@material-ui/core/Tabs';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { TabUI } from './HeaderTab';
 
 // TODO(blam): Remove this implementation when the Tabs are ready
 // This is just a temporary solution to implementing tabs for now
@@ -58,8 +59,19 @@ const useStyles = makeStyles(
 );
 
 export type Tab = {
+  group: string;
   id: string;
   label: string;
+  tabProps?: TabProps<React.ElementType, { component?: React.ElementType }>;
+  path: string;
+};
+
+export type TabItem = {
+  group: string;
+  id: string;
+  label: string;
+  index: number;
+  path: string;
   tabProps?: TabProps<React.ElementType, { component?: React.ElementType }>;
 };
 
@@ -76,48 +88,66 @@ type HeaderTabsProps = {
  *
  */
 export function HeaderTabs(props: HeaderTabsProps) {
-  const { tabs, onChange, selectedIndex } = props;
-  const [selectedTab, setSelectedTab] = useState<number>(selectedIndex ?? 0);
   const styles = useStyles();
 
+  const { tabs: items, onChange, selectedIndex: selectedItem = 0 } = props;
+
+  const groups = useMemo(
+    () => [...new Set(items.map(item => item.group))],
+    [items],
+  );
+
+  const [selectedGroup, setSelectedGroup] = useState<number>(
+    selectedItem ? groups.indexOf(items[selectedItem].group) : 0,
+  );
+
   const handleChange = useCallback(
-    (_: React.ChangeEvent<{}>, index: number) => {
-      if (selectedIndex === undefined) {
-        setSelectedTab(index);
-      }
-      if (onChange) onChange(index);
+    (index: number) => {
+      if (selectedItem !== index) onChange?.(index);
     },
-    [selectedIndex, onChange],
+    [selectedItem, onChange],
   );
 
   useEffect(() => {
-    if (selectedIndex !== undefined) {
-      setSelectedTab(selectedIndex);
-    }
-  }, [selectedIndex]);
+    if (selectedItem === undefined) return;
+    setSelectedGroup(groups.indexOf(items[selectedItem].group));
+  }, [items, selectedItem, groups, setSelectedGroup]);
 
   return (
     <Box className={styles.tabsWrapper}>
       <Tabs
+        selectionFollowsFocus
         indicatorColor="primary"
         textColor="inherit"
         variant="scrollable"
         scrollButtons="auto"
         aria-label="tabs"
-        onChange={handleChange}
-        value={selectedTab}
+        value={selectedGroup}
       >
-        {tabs.map((tab, index) => (
-          <TabUI
-            data-testid={`header-tab-${index}`}
-            label={tab.label}
-            key={tab.id}
-            value={index}
-            className={styles.defaultTab}
-            classes={{ selected: styles.selected, root: styles.tabRoot }}
-            {...tab.tabProps}
-          />
-        ))}
+        {groups.map((group, groupIndex) => {
+          const groupItems: TabItem[] = [];
+          items.forEach((item, itemIndex) => {
+            if (item.group === group) {
+              groupItems.push({
+                ...item,
+                index: itemIndex,
+              });
+            }
+          });
+          return (
+            <TabUI
+              data-testid={`header-tab-${groupIndex}`}
+              className={styles.defaultTab}
+              classes={{ selected: styles.selected, root: styles.tabRoot }}
+              key={group}
+              label={group}
+              value={groupIndex}
+              items={groupItems}
+              highlightedButton={selectedItem}
+              onSelectTab={() => handleChange(groupIndex)}
+            />
+          );
+        })}
       </Tabs>
     </Box>
   );

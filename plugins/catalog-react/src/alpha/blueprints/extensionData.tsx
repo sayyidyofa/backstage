@@ -32,3 +32,12 @@ export const entityFilterExpressionDataRef =
   createExtensionDataRef<string>().with({
     id: 'catalog.entity-filter-expression',
   });
+
+export const defaultEntityContentGroups = {
+  deployment: 'Deployment',
+};
+
+/** @internal */
+export const entityContentGroupDataRef = createExtensionDataRef<string>().with({
+  id: 'catalog.entity-content-group',
+});

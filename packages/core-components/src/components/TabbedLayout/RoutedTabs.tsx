@@ -69,14 +69,16 @@ export function RoutedTabs(props: { routes: SubRoute[] }) {
   const headerTabs = useMemo(
     () =>
       routes.map(t => {
-        const { path, title, tabProps } = t;
+        const { path, title, group, tabProps } = t;
         let to = path;
         // Remove trailing /*
         to = to.replace(/\/\*$/, '');
         // And remove leading / for relative navigation
         to = to.replace(/^\//, '');
         return {
+          group,
           id: path,
+          path: to,
           label: title,
           tabProps: {
             component: Link,

@@ -65,6 +65,7 @@ import { EntityContextMenu } from '../EntityContextMenu/EntityContextMenu';
 
 /** @public */
 export type EntityLayoutRouteProps = {
+  group: string;
   path: string;
   title: string;
   children: JSX.Element;
@@ -72,10 +73,20 @@ export type EntityLayoutRouteProps = {
   tabProps?: TabProps<React.ElementType, { component?: React.ElementType }>;
 };
 
-const dataKey = 'plugin.catalog.entityLayoutRoute';
+export type EntityLayoutGroupProps = {
+  title: string;
+  children: Array<JSX.Element> | JSX.Element;
+  tabProps?: TabProps<React.ElementType, { component?: React.ElementType }>;
+  if?: (entity: Entity) => boolean;
+};
 
+const groupDataKey = 'plugin.catalog.entityLayoutGroup';
+const Group: (props: EntityLayoutGroupProps) => null = () => null;
+attachComponentData(Group, groupDataKey, true);
+
+const routeDataKey = 'plugin.catalog.entityLayoutRoute';
 const Route: (props: EntityLayoutRouteProps) => null = () => null;
-attachComponentData(Route, dataKey, true);
+attachComponentData(Route, routeDataKey, true);
 attachComponentData(Route, 'core.gatherMountPoints', true); // This causes all mount points that are discovered within this route to use the path of the route itself
 
 function EntityLayoutTitle(props: {
@@ -247,14 +258,12 @@ export const EntityLayout = (props: EntityLayoutProps) => {
   const { kind, namespace, name } = useRouteRefParams(entityRouteRef);
   const { entity, loading, error } = useAsyncEntity();
   const location = useLocation();
-  const routes = useElementFilter(
+  const singleRoutes = useElementFilter(
     children,
     elements =>
       elements
         .selectByComponentData({
-          key: dataKey,
-          withStrictError:
-            'Child of EntityLayout must be an EntityLayout.Route',
+          key: routeDataKey,
         })
         .getElements<EntityLayoutRouteProps>() // all nodes, element data, maintain structure or not?
         .flatMap(({ props: elementProps }) => {
@@ -263,15 +272,47 @@ export const EntityLayout = (props: EntityLayoutProps) => {
           } else if (elementProps.if && !elementProps.if(entity)) {
             return [];
           }
-
           return [
             {
+              group: elementProps.group,
               path: elementProps.path,
               title: elementProps.title,
               children: elementProps.children,
               tabProps: elementProps.tabProps,
             },
           ];
+        }),
+    [entity],
+  );
+
+  const groupRoutes = useElementFilter(
+    children,
+    elements =>
+      elements
+        .selectByComponentData({
+          key: groupDataKey,
+        })
+        .getElements<EntityLayoutGroupProps>()
+        .flatMap(({ props: elementProps }) => {
+          if (entity && elementProps.if && !elementProps.if(entity)) {
+            return [];
+          }
+          return Array.of(elementProps.children)
+            .flat()
+            .flatMap(({ props: e }) => {
+              if (!e) {
+                return [];
+              } else if (entity && e.if && !e.if(entity)) {
+                return [];
+              }
+              return {
+                group: elementProps.title,
+                path: e.path,
+                title: e.title,
+                children: e.children,
+                tabProps: e.tabProps,
+              };
+            });
         }),
     [entity],
   );
@@ -363,7 +404,9 @@ export const EntityLayout = (props: EntityLayoutProps) => {
 
       {loading && <Progress />}
 
-      {entity && <RoutedTabs routes={routes} />}
+      {entity && (
+        <RoutedTabs routes={groupRoutes.length ? groupRoutes : singleRoutes} />
+      )}
 
       {error && (
         <Content>
@@ -412,3 +455,4 @@ export const EntityLayout = (props: EntityLayoutProps) => {
 };
 
 EntityLayout.Route = Route;
+EntityLayout.Group = Group;

@@ -18,6 +18,7 @@ import { TabProps } from '@material-ui/core/Tab';
 import * as React from 'react';
 
 export type SubRoute = {
+  group: string;
   path: string;
   title: string;
   children: JSX.Element;

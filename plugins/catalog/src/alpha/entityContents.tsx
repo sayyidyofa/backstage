@@ -35,6 +35,7 @@ export const catalogOverviewEntityContent =
       return originalFactory({
         defaultPath: '/',
         defaultTitle: 'Overview',
+        defaultGroup: 'deployment',
         loader: async () =>
           import('./EntityOverviewPage').then(m => (
             <m.EntityOverviewPage
